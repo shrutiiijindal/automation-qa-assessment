@@ -43,3 +43,4 @@ the two Discord nodes.
 - `Task2_Workflow_Shruti Jindal.json`: exported workflow
 - `canvas.png`: the workflow canvas
 - `output.png` `output2.png` : a successful run with output data
+- loom video : https://www.loom.com/share/bc84ab60a7cb484ab19785b6c8594c61
