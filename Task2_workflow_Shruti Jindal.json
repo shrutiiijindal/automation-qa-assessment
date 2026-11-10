@@ -1,0 +1,358 @@
+{
+  "name": "Morning Brief - HackerNews Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "d4a4974a-9bed-412a-8b5b-6346df2d0c85",
+      "name": "Every 1 Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://hacker-news.firebaseio.com/v0/topstories.json",
+        "options": {}
+      },
+      "id": "f2f1c2a6-36cf-450f-bd86-6d8c6ca1205c",
+      "name": "Get Top Story IDs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        176
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Take the HackerNews response and keep only the first 5 story IDs.\nconst all = $input.all();\nlet ids = [];\nif (all.length === 1 && Array.isArray(all[0].json)) {\n  ids = all[0].json;\n} else if (all.length === 1 && Array.isArray(all[0].json.data)) {\n  ids = all[0].json.data;\n} else {\n  ids = all.map(i => (typeof i.json === 'object' ? (i.json.data ?? i.json.id ?? Object.values(i.json)[0]) : i.json));\n}\nids = ids.slice(0, 5);\n// Return one item per ID so the next node runs once per story\nreturn ids.map(id => ({ json: { id } }));"
+      },
+      "id": "ef599588-3619-4daa-af29-b2cedc7b2f9b",
+      "name": "Keep Top 5",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://hacker-news.firebaseio.com/v0/item/{{ $json.id }}.json",
+        "options": {}
+      },
+      "id": "24872cd0-c14c-417e-9b13-9bf9fe03a1de",
+      "name": "Get Story Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        656,
+        80
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.score }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "780d6698-01b7-406f-a6ec-d8b7f50113eb",
+      "name": "Score > 200?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n6-a",
+              "name": "label",
+              "value": "🔥 HOT",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "08e5b2b6-8379-4167-b8ec-e054dc273b61",
+      "name": "Label Hot",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1104,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n7-a",
+              "name": "label",
+              "value": "📄 Normal",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "7b057574-70f7-45f9-8040-99a6a814066b",
+      "name": "Label Normal",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1104,
+        176
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f23a9941-8dca-4a17-8e1c-63bb18b1c865",
+      "name": "Combine Stories",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1328,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine all stories into ONE message for Discord.\nconst items = $input.all();\nconst lines = items.map((item, n) => {\n  const s = item.json;\n  const link = s.url || ('https://news.ycombinator.com/item?id=' + s.id);\n  return s.label + ' ' + (n + 1) + '. ' + s.title + '\\n' + s.score + ' points | ' + (s.descendants ?? 0) + ' comments\\n' + link;\n});\nconst message = '📰 Morning Brief: Top 5 on Hacker News\\n\\n' + lines.join('\\n\\n');\nreturn [{ json: { message } }];"
+      },
+      "id": "b6f5a2f1-1856-4653-9cb3-8160f8f7b7c2",
+      "name": "Build Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "={{ $json.message }}",
+        "options": {}
+      },
+      "id": "40d5e72f-e659-4c0a-9db5-3bcbddcb85e6",
+      "name": "Send Digest to Discord",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        80
+      ],
+      "webhookId": "cde6e24b-2bd1-40bf-9f5f-86b53a03bee5",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "h88yCn30gfBeSc27",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=⚠️ Morning Brief: an API call failed. Details: {{ JSON.stringify($json).slice(0, 400) }}",
+        "options": {}
+      },
+      "id": "abc77623-4962-4443-8c0c-a4193ee78565",
+      "name": "Send Failure Alert",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        656,
+        368
+      ],
+      "webhookId": "1a2876d4-1deb-459d-bb15-f2dabe1cef6c",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "h88yCn30gfBeSc27",
+          "name": "Discord Webhook account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 1 Hour": {
+      "main": [
+        [
+          {
+            "node": "Get Top Story IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Top Story IDs": {
+      "main": [
+        [
+          {
+            "node": "Keep Top 5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Failure Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Top 5": {
+      "main": [
+        [
+          {
+            "node": "Get Story Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Story Details": {
+      "main": [
+        [
+          {
+            "node": "Score > 200?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Failure Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score > 200?": {
+      "main": [
+        [
+          {
+            "node": "Label Hot",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Label Normal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label Hot": {
+      "main": [
+        [
+          {
+            "node": "Combine Stories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label Normal": {
+      "main": [
+        [
+          {
+            "node": "Combine Stories",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Stories": {
+      "main": [
+        [
+          {
+            "node": "Build Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Digest": {
+      "main": [
+        [
+          {
+            "node": "Send Digest to Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "1e626b45-f73f-42c1-ac04-0b9ba47d8c13",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b8317c5c594002f69362c07ccd973829558978ed2f8ea96b73eac4035462f556"
+  },
+  "nodeGroups": [],
+  "id": "FnGeWhPsF0bNJEKG",
+  "tags": []
+}
